@@ -21,10 +21,9 @@ void KalmanFilter::Init(VectorXd &x_in, MatrixXd &P_in, MatrixXd &F_in,
 }
 
 void KalmanFilter::Predict() {
-  /**
-  TODO:
-    * predict the state
-  */
+  x_ = F_ * x_;
+	MatrixXd Ft = F_.transpose();
+	P_ = F_ * P_ * Ft + Q_;
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
@@ -44,8 +43,35 @@ void KalmanFilter::Update(const VectorXd &z) {
 }
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
-  /**
-  TODO:
-    * update the state by using Extended Kalman Filter equations
-  */
+  float px = x_(0);
+  float py = x_(1);
+  float vx = x_(2);
+  float vy = x_(3);
+  
+  float eps = 0.000001;  // Make sure we don't divide by 0.
+  
+  float ro = sqrtf(px * px + py * py);
+  if (fabs(px) < eps || fabs(ro) < eps) return;
+  
+  float theta = atan2f(py, px);
+  float ro_dot = (px * vx + py * vy) / ro;
+  
+  VectorXd hx = VectorXd(3);
+  hx << ro, theta, ro_dot;
+  
+  // Intermediate calculations.
+  VectorXd y = z - hx;
+  
+  //normalizing angles exceeding +/-pi
+  y[1]=atan2(sin(y[1]), cos(y[1]));
+  
+  MatrixXd Ht = H_.transpose();
+  MatrixXd S = H_ * (P_ * Ht) + R_;
+  MatrixXd K = P_ * Ht * S.inverse();
+  long size = x_.size();
+  MatrixXd I = MatrixXd::Identity(size, size);
+  
+  // Update state and covariance mats.
+  x_ = x_ + K * y;
+  P_ = (I - K * H_) * P_;
 }
